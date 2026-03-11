@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jira → ClickUp Sync</title>
+  <meta name="description"
+    content="Sync your Jira tasks directly into ClickUp lists with field mapping and bulk sync." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+  <!-- ── HEADER ── -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
+        </div>
+        <span class="brand-name">Jira <span class="arrow">→</span> ClickUp <span class="brand-sub">Sync</span></span>
+      </div>
+      <div class="header-status" id="headerStatus">
+        <span class="status-dot"></span>
+        <span id="headerStatusText">Not connected</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── MAIN ── -->
+  <main class="main-container">
+
+    <!-- STEP 1: Jira Credentials -->
+    <section class="card step-card active" id="step1">
+      <div class="step-header">
+        <div class="step-badge jira-badge">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.94 4.34 4.34 4.35V2.84a.84.84 0 0 0-.84-.84zm-4.5 4.38c0 2.4 1.96 4.35 4.35 4.35h1.78v1.71c0 2.4 1.95 4.34 4.35 4.35V7.22a.84.84 0 0 0-.84-.84zm-4.51 4.38c0 2.4 1.96 4.35 4.35 4.35h1.79v1.71c0 2.4 1.95 4.34 4.34 4.35V11.6a.84.84 0 0 0-.83-.84z" />
+          </svg>
+          Jira
+        </div>
+        <h2 class="step-title">Connect to Jira</h2>
+        <div class="step-status" id="jiraStatus"></div>
+      </div>
+      <div class="form-grid">
+        <div class="field-group full-width">
+          <label class="field-label" for="jiraUrl">Jira Base URL</label>
+          <input class="field-input" id="jiraUrl" type="url" placeholder="https://yourorg.atlassian.net"
+            autocomplete="off" />
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="jiraEmail">Email</label>
+          <input class="field-input" id="jiraEmail" type="email" placeholder="you@example.com" autocomplete="off" />
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="jiraToken">
+            API Token
+            <a class="help-link" href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank"
+              title="Generate API token">↗</a>
+          </label>
+          <div class="input-with-toggle">
+            <input class="field-input" id="jiraToken" type="password" placeholder="Paste your API token"
+              autocomplete="off" />
+            <button class="toggle-btn" onclick="toggleVis('jiraToken')" title="Toggle visibility">👁</button>
+          </div>
+        </div>
+      </div>
+      <div class="card-actions" style="justify-content: space-between; align-items: center;">
+        <label class="checkbox-row" style="color: var(--text-muted);">
+          <input type="checkbox" id="jiraRemember" checked />
+          Remember Me
+        </label>
+        <button class="btn btn-jira" id="jiraConnectBtn" onclick="connectJira()">
+          <span class="btn-text">Connect to Jira</span>
+          <span class="btn-spinner hidden"></span>
+        </button>
+      </div>
+      <div class="error-box hidden" id="jiraError"></div>
+    </section>
+
+    <!-- STEP 2: ClickUp Credentials -->
+    <section class="card step-card" id="step2">
+      <div class="step-header">
+        <div class="step-badge clickup-badge">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 12.3l1.8-1.8 4.2 4.2 11-11 1.8 1.8-12.8 12.8z" />
+          </svg>
+          ClickUp
+        </div>
+        <h2 class="step-title">Connect to ClickUp</h2>
+        <div class="step-status" id="clickupStatus"></div>
+      </div>
+      <div class="form-grid">
+        <div class="field-group full-width">
+          <label class="field-label" for="clickupToken">
+            Personal API Token
+            <a class="help-link" href="https://app.clickup.com/settings/apps" target="_blank"
+              title="Get ClickUp API token">↗</a>
+          </label>
+          <div class="input-with-toggle">
+            <input class="field-input" id="clickupToken" type="password" placeholder="pk_xxxxxxxxx..."
+              autocomplete="off" />
+            <button class="toggle-btn" onclick="toggleVis('clickupToken')" title="Toggle visibility">👁</button>
+          </div>
+        </div>
+      </div>
+      <div class="card-actions" style="justify-content: space-between; align-items: center;">
+        <label class="checkbox-row" style="color: var(--text-muted);">
+          <input type="checkbox" id="clickupRemember" checked />
+          Remember Me
+        </label>
+        <button class="btn btn-clickup" id="clickupConnectBtn" onclick="connectClickUp()">
+          <span class="btn-text">Connect to ClickUp</span>
+          <span class="btn-spinner hidden"></span>
+        </button>
+      </div>
+      <div class="error-box hidden" id="clickupError"></div>
+    </section>
+
+    <!-- STEP 3: Jira Source -->
+    <section class="card step-card locked" id="step3">
+      <div class="step-header">
+        <div class="step-badge neutral-badge">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+        </div>
+        <h2 class="step-title">Select Jira Source</h2>
+      </div>
+
+      <!-- Mode tabs -->
+      <div class="tab-bar">
+        <button class="tab active" id="tabProject" onclick="setSourceMode('project')">By Project</button>
+        <button class="tab" id="tabFilter" onclick="setSourceMode('filter')">Saved Filter</button>
+        <button class="tab" id="tabJql" onclick="setSourceMode('jql')">Custom JQL</button>
+      </div>
+
+      <!-- Project mode -->
+      <div class="source-mode" id="modeProject">
+        <div class="field-group full-width">
+          <label class="field-label" for="jiraProject">Project</label>
+          <select class="field-input field-select" id="jiraProject">
+            <option value="">— Select a project —</option>
+          </select>
+        </div>
+        <div class="field-group full-width">
+          <label class="field-label" for="jiraStatusFilter">Status Filter (optional)</label>
+          <input class="field-input" id="jiraStatusFilter" type="text"
+            placeholder='e.g. "To Do", "In Progress" (comma-separated)' />
+        </div>
+      </div>
+
+      <!-- Filter mode -->
+      <div class="source-mode hidden" id="modeFilter">
+        <div class="field-group full-width">
+          <label class="field-label" for="jiraFilter">Saved Filter</label>
+          <select class="field-input field-select" id="jiraFilter">
+            <option value="">— Select a filter —</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- JQL mode -->
+      <div class="source-mode hidden" id="modeJql">
+        <div class="field-group full-width">
+          <label class="field-label" for="jiraJql">JQL Query</label>
+          <textarea class="field-input field-textarea" id="jiraJql" rows="3"
+            placeholder='project = "MY_PROJECT" AND status != Done ORDER BY priority DESC'></textarea>
+        </div>
+      </div>
+
+      <div class="card-actions">
+        <button class="btn btn-neutral" id="fetchIssuesBtn" onclick="fetchIssues()">
+          <span class="btn-text">Preview Tasks</span>
+          <span class="btn-spinner hidden"></span>
+        </button>
+      </div>
+      <div class="error-box hidden" id="jiraSourceError"></div>
+
+      <!-- Issues preview -->
+      <div class="issues-preview hidden" id="issuesPreview">
+        <div class="preview-header">
+          <span id="issueCount" class="issue-count-badge">0 tasks found</span>
+          <label class="checkbox-row">
+            <input type="checkbox" id="selectAllIssues" onchange="toggleSelectAll(this)" />
+            Select all
+          </label>
+        </div>
+        <div class="issues-list" id="issuesList"></div>
+      </div>
+    </section>
+
+    <!-- STEP 4: ClickUp Destination -->
+    <section class="card step-card locked" id="step4">
+      <div class="step-header">
+        <div class="step-badge clickup-badge">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+          </svg>
+        </div>
+        <h2 class="step-title">ClickUp Destination</h2>
+      </div>
+      <div class="form-grid">
+        <div class="field-group">
+          <label class="field-label" for="cuWorkspace">Workspace</label>
+          <select class="field-input field-select" id="cuWorkspace" onchange="onWorkspaceChange()">
+            <option value="">— Select workspace —</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="cuSpace">Space</label>
+          <select class="field-input field-select" id="cuSpace" onchange="onSpaceChange()" disabled>
+            <option value="">— Select space —</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="cuFolder">Folder <span class="optional-tag">optional</span></label>
+          <select class="field-input field-select" id="cuFolder" onchange="onFolderChange()" disabled>
+            <option value="">— No folder (root lists) —</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="cuList">List <span class="required-tag">required</span></label>
+          <select class="field-input field-select" id="cuList" disabled>
+            <option value="">— Select list —</option>
+          </select>
+        </div>
+      </div>
+      <div class="error-box hidden" id="cuDestError"></div>
+    </section>
+
+    <!-- STEP 5: Field Mapping & Options -->
+    <section class="card step-card locked" id="step5">
+      <div class="step-header">
+        <div class="step-badge neutral-badge">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path
+              d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18" />
+          </svg>
+        </div>
+        <h2 class="step-title">Sync Options</h2>
+      </div>
+      <div class="options-grid">
+        <label class="option-toggle">
+          <input type="checkbox" id="optPriority" checked />
+          <div class="toggle-track">
+            <div class="toggle-knob"></div>
+          </div>
+          <span>Sync Priority</span>
+        </label>
+        <label class="option-toggle">
+          <input type="checkbox" id="optLabels" checked />
+          <div class="toggle-track">
+            <div class="toggle-knob"></div>
+          </div>
+          <span>Sync Labels / Tags</span>
+        </label>
+        <label class="option-toggle">
+          <input type="checkbox" id="optDescription" checked />
+          <div class="toggle-track">
+            <div class="toggle-knob"></div>
+          </div>
+          <span>Sync Description</span>
+        </label>
+        <label class="option-toggle">
+          <input type="checkbox" id="optDueDate" checked />
+          <div class="toggle-track">
+            <div class="toggle-knob"></div>
+          </div>
+          <span>Sync Due Date</span>
+        </label>
+      </div>
+      <div class="prefix-option">
+        <label class="field-label" for="taskPrefix">Task Name Prefix</label>
+        <input class="field-input" id="taskPrefix" type="text" placeholder="[JIRA] (optional)" maxlength="30" />
+        <span class="field-hint">Prepended before task name. Leave blank to use [KEY] format.</span>
+      </div>
+    </section>
+
+    <!-- STEP 6: Sync Panel -->
+    <section class="card sync-panel locked" id="step6">
+      <div class="sync-panel-inner">
+        <div class="sync-summary" id="syncSummary">
+          <span id="syncTaskCount">0 tasks</span> will be synced to <span id="syncDestName">—</span>
+        </div>
+        <button class="btn btn-sync" id="syncBtn" onclick="startSync()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 2v6h-6" />
+            <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+            <path d="M3 22v-6h6" />
+            <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+          </svg>
+          Sync Now
+        </button>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress-wrap hidden" id="progressWrap">
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+        </div>
+        <div class="progress-label" id="progressLabel">Syncing…</div>
+      </div>
+
+      <!-- Results -->
+      <div class="results-wrap hidden" id="resultsWrap">
+        <div class="results-stats" id="resultsStats"></div>
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th>Jira Key</th>
+              <th>Status</th>
+              <th>ClickUp Task</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- STEP 7: ClickUp Webhook (Sync-Back) -->
+    <section class="card step-card locked" id="step7">
+      <div class="step-header">
+        <div class="step-badge clickup-badge">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 14l5 5-5 5" />
+            <path d="M4 4v7a4 4 0 0 0 4 4h12" />
+          </svg>
+        </div>
+        <h2 class="step-title">ClickUp → ClickUp Webhook</h2>
+      </div>
+      <div class="webhook-info">
+        <p class="field-hint" style="margin-bottom:12px">Once a task hits <strong>"QA PARK"</strong> in the selected
+          spaces, all its linked tasks will be automatically set to <strong>"Completed"</strong>.</p>
+
+        <div class="form-grid">
+          <div class="field-group">
+            <label class="field-label" style="display:flex; justify-content:space-between; align-items:center;">
+              Public Server URL
+              <span class="required-tag" style="font-size:0.6rem;">Required for Automation</span>
+            </label>
+            <input type="text" id="webhookPublicUrl" class="field-input"
+              placeholder="https://your-ngrok-id.ngrok-free.app" />
+            <span class="field-hint">Your public URL (e.g. from ngrok) needed for ClickUp to send events.</span>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Filter by Spaces</label>
+            <div id="webhookSpaceList" class="space-checkbox-grid">
+              <!-- Populated by app.js -->
+              <div style="color:var(--text-muted); font-size:0.8rem;">Connect ClickUp to see spaces here.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-actions"
+          style="margin-top:20px; border-bottom: 1px solid var(--border); padding-bottom: 20px; justify-content: flex-start;">
+          <button class="btn btn-clickup" id="initWebhookBtn" onclick="initiateWebhook()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2v20M2 12h20" />
+            </svg>
+            Initiate Webhook
+          </button>
+          <span class="field-hint" style="margin-left:12px; max-width:200px;">This will automatically register the
+            webhook in ClickUp.</span>
+        </div>
+
+        <div class="field-group full-width" style="margin-top:20px">
+          <label class="field-label">Or Setup Manually</label>
+          <div class="webhook-url-box">
+            <input type="text" id="webhookUrlInput" class="field-input readonly-input" readonly
+              value="Connect to generate URL..." />
+            <button class="btn-copy" onclick="copyWebhookUrl()" title="Copy to clipboard">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            </button>
+          </div>
+          <span class="field-hint">Paste this URL into ClickUp ➔ Settings ➔ Webhooks for the
+            <strong>taskStatusUpdated</strong> event.</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="app-footer">
+    Credentials are kept in memory only and never stored anywhere • Jira → ClickUp Sync Tool
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
