@@ -321,25 +321,31 @@ app.post('/api/webhook/clickup', async (req, res) => {
     console.log(`Webhook Triggered: Task ${taskId} is now QA PARK. Syncing linked tasks...`);
 
     // 2. Identify linked tasks (Task Links)
-    // ClickUp returns links in task.links or task.relationships in some API versions
-    // We'll look for generic task links
-    const linkedTasks = (task.linked_tasks || []).map(l => l.link_id === task.id ? l.task_id : l.link_id);
+    // ClickUp returns links in task.linked_tasks
+    let linkedTasks = (task.linked_tasks || []).map(l => l.link_id === task.id ? l.task_id : l.link_id);
+
+    // Deduplicate IDs
+    linkedTasks = [...new Set(linkedTasks)];
 
     if (!linkedTasks.length) {
       return res.send('no linked tasks found');
     }
 
-    // 3. Update all linked tasks to 'completed'
+    // 3. Update all linked tasks to 'complete'
+    // Note: 'complete' (lowercase) is the standard API identifier for Closed status in many ClickUp lists.
     const updatePromises = linkedTasks.map(targetId =>
-      cuClient.put(`/task/${targetId}`, { status: 'completed' })
-        .catch(e => console.error(`Failed to update linked task ${targetId}:`, e.message))
+      cuClient.put(`/task/${targetId}`, { status: 'complete' })
+        .catch(e => {
+          const errMsg = e.response?.data?.err || e.response?.data || e.message;
+          console.error(`Failed to update linked task ${targetId}: ${errMsg}`);
+        })
     );
 
     await Promise.all(updatePromises);
-    res.send(`Successfully updated ${linkedTasks.length} linked tasks`);
+    res.send(`Successfully processed ${linkedTasks.length} linked tasks`);
 
   } catch (e) {
-    console.error('Webhook Error:', e.response?.data || e.message);
+    console.error('Webhook Error:', e.response?.data?.err || e.response?.data || e.message);
     res.status(500).send('Internal error');
   }
 });
