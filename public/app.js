@@ -526,9 +526,11 @@ async function loadAllSpacesForWebhook() {
 
         spaces.forEach(s => {
             const div = document.createElement('div');
+            const isActive = state.webhook?.active && state.webhook.spaces?.split(',').includes(s.id);
+            const isDisabled = state.webhook?.active ? 'disabled' : '';
             div.innerHTML = `
         <label class="checkbox-row" style="color:var(--text)">
-          <input type="checkbox" name="webhookSpace" value="${s.id}" onchange="updateWebhookUrl()" />
+          <input type="checkbox" name="webhookSpace" value="${s.id}" onchange="updateWebhookUrl()" ${isActive ? 'checked' : ''} ${isDisabled} />
           <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escHtml(s.name)}">${escHtml(s.name)}</span>
         </label>`;
             spaceList.appendChild(div);
@@ -568,10 +570,7 @@ async function initiateWebhook() {
         return;
     }
 
-    const btn = document.getElementById('initWebhookBtn');
-    const originalText = btn.innerText;
-    btn.disabled = true;
-    btn.innerText = 'Creating Webhook…';
+    setLoading('initWebhookBtn', true);
 
     try {
         const teamId = document.getElementById('cuWorkspace').value || state.clickup.teams[0]?.id;
@@ -582,29 +581,128 @@ async function initiateWebhook() {
             spaces: selectedSpaces.join(',')
         };
 
-        const result = await api('POST', '/api/clickup/webhook/setup', payload);
+        const result = await api('POST', '/api/clickup/webhook/setup', payload, cuHeaders());
         
         // Save to state and update UI
-        state.webhook = { active: true, ...result };
+        state.webhook = { 
+            active: true, 
+            ...result, 
+            endpointBase: payload.endpointBase, 
+            spaces: payload.spaces 
+        };
+        updateWebhookUI();
         
         alert(`Successfully created webhook in ClickUp!\nWebhook ID: ${result.id}`);
-        btn.innerText = '✓ Webhook Created';
-        btn.style.background = 'var(--green)';
-        btn.disabled = true;
     } catch (e) {
         alert(`Failed to create webhook: ${e.message}`);
-        btn.innerText = 'Failed';
-        btn.style.background = 'var(--red)';
-        setTimeout(() => {
-            btn.disabled = false;
-            btn.innerText = originalText;
-            btn.style.background = '';
-        }, 3000);
     } finally {
-        // Only re-enable if it failed
-        if (!state.webhook?.active) {
-            btn.disabled = false;
+        setLoading('initWebhookBtn', false);
+    }
+}
+
+async function disableWebhook() {
+    if (!confirm('Are you sure you want to disable and remove this webhook?')) return;
+
+    setLoading('initWebhookBtn', true);
+    try {
+        await api('DELETE', '/api/clickup/webhook', null, cuHeaders());
+        
+        state.webhook.active = false;
+        alert('Webhook disabled and removed successfully.');
+        updateWebhookUI();
+    } catch (e) {
+        alert(`Failed to disable webhook: ${e.message}`);
+    } finally {
+        setLoading('initWebhookBtn', false);
+    }
+}
+
+function toggleWebhook() {
+    if (state.webhook?.active) {
+        disableWebhook();
+    } else {
+        initiateWebhook();
+    }
+}
+
+function updateWebhookUI() {
+    const btn = document.getElementById('initWebhookBtn');
+    const badge = document.getElementById('webhookStatusBadge');
+    const publicUrlInput = document.getElementById('webhookPublicUrl');
+    const spaceCheckboxes = document.querySelectorAll('input[name="webhookSpace"]');
+
+    if (state.webhook?.active) {
+        // Show values and disable inputs
+        if (state.webhook.endpointBase) {
+            publicUrlInput.value = state.webhook.endpointBase;
         }
+        publicUrlInput.disabled = true;
+        
+        const activeSpaces = state.webhook.spaces ? state.webhook.spaces.split(',') : [];
+        spaceCheckboxes.forEach(cb => {
+            cb.checked = activeSpaces.includes(cb.value);
+            cb.disabled = true;
+        });
+
+        btn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+            Disable Webhook
+        `;
+        btn.style.background = 'var(--red)';
+        
+        badge.innerText = 'Status: Active';
+        badge.style.background = 'rgba(16, 185, 129, 0.2)';
+        badge.style.color = '#10b981';
+        badge.style.borderColor = '#10b981';
+
+        document.getElementById('webhookLogSection').classList.remove('hidden');
+    } else {
+        // Restore/Enable inputs
+        publicUrlInput.disabled = false;
+        spaceCheckboxes.forEach(cb => cb.disabled = false);
+
+        btn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2v20M2 12h20" />
+            </svg>
+            Initiate Webhook
+        `;
+        btn.style.background = '';
+
+        badge.innerText = 'Status: Not Setup';
+        badge.style.background = 'var(--bg-card)';
+        badge.style.color = 'var(--text-muted)';
+        badge.style.borderColor = 'var(--border)';
+    }
+    
+    // Always update the manual URL box
+    updateWebhookUrl();
+}
+
+async function listAllWebhooks() {
+    const teamId = document.getElementById('cuWorkspace').value || state.clickup.teams[0]?.id;
+    if (!teamId) return alert('Please connect ClickUp first.');
+
+    setLoading('checkWebhookBtn', true);
+    try {
+        const data = await api('GET', `/api/clickup/webhooks?teamId=${teamId}`, null, cuHeaders());
+        const webhooks = data.webhooks || [];
+        
+        if (webhooks.length > 0) {
+            const list = webhooks.map(w => `• ${w.endpoint} (${w.status})`).join('\n');
+            alert(`Found ${webhooks.length} webhooks in ClickUp:\n\n${list}\n\nNote: If your URL matches, you can manually update the server status if needed.`);
+            
+            // If any webhook matches our current URL logic, we could auto-activate
+            // For now, just show them to the user as requested.
+        } else {
+            alert('No webhooks found for this team in ClickUp.');
+        }
+    } catch (e) {
+        alert(`Failed to check ClickUp: ${e.message}`);
+    } finally {
+        setLoading('checkWebhookBtn', false);
     }
 }
 
@@ -613,22 +711,44 @@ async function checkWebhookStatus() {
         const status = await api('GET', '/api/webhook/status');
         if (status && status.active) {
             state.webhook = status;
-            const btn = document.getElementById('initWebhookBtn');
-            if (btn) {
-                btn.innerText = '✓ Webhook Active';
-                btn.style.background = 'var(--green)';
-                btn.disabled = true;
-                
-                // Also update the description hint to show it's already setup
-                const hint = btn.nextElementSibling;
-                if (hint) {
-                    hint.innerText = 'Webhook is currently active on the server.';
-                }
-            }
+        } else {
+            state.webhook = { active: false };
         }
+        updateWebhookUI();
     } catch (e) {
         console.error('Failed to fetch webhook status:', e.message);
     }
+}
+
+async function pollWebhookLogs() {
+    const logContainer = document.getElementById('webhookLogs');
+    const pulse = document.getElementById('logUpdatePulse');
+    const logSection = document.getElementById('webhookLogSection');
+
+    try {
+        const logs = await api('GET', '/api/webhook/logs');
+        if (logs && logs.length > 0) {
+            logSection.classList.remove('hidden');
+            
+            // Pulsate to show update
+            pulse.classList.remove('hidden');
+            setTimeout(() => pulse.classList.add('hidden'), 1000);
+
+            logContainer.innerHTML = logs.map(l => {
+                const time = new Date(l.timestamp).toLocaleTimeString();
+                return `<div style="margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">
+                    <span style="color: var(--blue)">[${time}]</span> 
+                    <span style="color: #10b981; font-weight: bold;">${l.event}</span><br/>
+                    <span style="color: var(--text-muted)">${l.details || ''}</span>
+                </div>`;
+            }).join('');
+        }
+    } catch (e) {
+        console.error('Log polling failed:', e.message);
+    }
+    
+    // Poll every 5 seconds
+    setTimeout(pollWebhookLogs, 5000);
 }
 
 function copyWebhookUrl() {
@@ -672,6 +792,7 @@ function initPersistence() {
     }
 
     checkWebhookStatus();
+    pollWebhookLogs();
 }
 
 // Listen for list change to update sync summary

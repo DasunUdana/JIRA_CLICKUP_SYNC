@@ -337,7 +337,12 @@
             <path d="M4 4v7a4 4 0 0 0 4 4h12" />
           </svg>
         </div>
-        <h2 class="step-title">ClickUp → ClickUp Webhook</h2>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+          <h2 class="step-title" style="margin: 0;">ClickUp → ClickUp Webhook</h2>
+          <div id="webhookStatusBadge" class="badge badge-status" style="font-size: 0.75rem; padding: 4px 10px; border-radius: 12px; background: var(--bg-card); color: var(--text-muted); border: 1px solid var(--border);">
+            Status: Unknown
+          </div>
+        </div>
       </div>
       <div class="webhook-info">
         <p class="field-hint" style="margin-bottom:12px">Once a task hits <strong>"QA PARK"</strong> in the selected
@@ -364,14 +369,31 @@
 
         <div class="card-actions"
           style="margin-top:20px; border-bottom: 1px solid var(--border); padding-bottom: 20px; justify-content: flex-start;">
-          <button class="btn btn-clickup" id="initWebhookBtn" onclick="initiateWebhook()">
+          <button class="btn btn-clickup" id="initWebhookBtn" onclick="toggleWebhook()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 2v20M2 12h20" />
             </svg>
             Initiate Webhook
           </button>
-          <span class="field-hint" style="margin-left:12px; max-width:200px;">This will automatically register the
-            webhook in ClickUp.</span>
+          <button class="btn btn-neutral" id="checkWebhookBtn" onclick="listAllWebhooks()" style="margin-left: 8px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            Check Active
+          </button>
+          <span class="field-hint" style="margin-left:12px; max-width:200px;">Register or check existing webhooks in ClickUp.</span>
+        </div>
+
+        <!-- Recent Events Log -->
+        <div id="webhookLogSection" class="hidden" style="margin-top: 24px; border-top: 1px solid var(--border); padding-top: 20px;">
+          <h3 class="field-label" style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+            Recent ClickUp activity
+            <span id="logUpdatePulse" class="status-dot connected hidden" style="width: 8px; height: 8px;"></span>
+          </h3>
+          <div id="webhookLogs" class="webhook-log-container" style="max-height: 150px; overflow-y: auto; background: rgba(0,0,0,0.1); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.75rem;">
+            <div style="color: var(--text-muted);">Listening for events...</div>
+          </div>
         </div>
 
         <div class="field-group full-width" style="margin-top:20px">

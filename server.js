@@ -8,11 +8,15 @@ const app = express();
 const PORT = 3000;
 
 const STATUS_FILE = path.join(__dirname, 'webhook_status.json');
+const WEBHOOK_LOGS = [];
+
+let healthCheckInterval = null;
 
 function getWebhookStatus() {
   try {
     if (fs.existsSync(STATUS_FILE)) {
-      return JSON.parse(fs.readFileSync(STATUS_FILE, 'utf8'));
+      const status = JSON.parse(fs.readFileSync(STATUS_FILE, 'utf8'));
+      return status;
     }
   } catch (e) {
     console.error('Error reading status file:', e.message);
@@ -23,8 +27,58 @@ function getWebhookStatus() {
 function saveWebhookStatus(status) {
   try {
     fs.writeFileSync(STATUS_FILE, JSON.stringify(status, null, 2));
+    // (Re)start health check if active
+    if (status.active) {
+      startHealthCheck();
+    } else {
+      stopHealthCheck();
+    }
   } catch (e) {
     console.error('Error writing status file:', e.message);
+  }
+}
+
+async function verifyWebhookConnectivity() {
+  const status = getWebhookStatus();
+  if (!status.active || !status.webhookId || !status.teamId || !status.token) return;
+
+  try {
+    const cuClient = axios.create({
+      baseURL: 'https://api.clickup.com/api/v2',
+      headers: { Authorization: status.token, 'Content-Type': 'application/json' },
+    });
+    
+    // Check if the specific webhook exists and is active
+    const { data } = await cuClient.get(`/team/${status.teamId}/webhook`);
+    const exists = (data.webhooks || []).find(w => w.id === status.webhookId && w.status === 'active');
+    
+    if (!exists) {
+      console.warn(`Health Check: Webhook ${status.webhookId} not found or inactive in ClickUp. Updating local status.`);
+      saveWebhookStatus({ ...status, active: false, error: 'Webhook disconnected or removed in ClickUp' });
+      
+      WEBHOOK_LOGS.unshift({
+        timestamp: new Date().toISOString(),
+        event: 'Health Check Failed',
+        details: 'Webhook was removed or deactivated in ClickUp.'
+      });
+    }
+  } catch (e) {
+    console.error('Health Check Error:', e.message);
+  }
+}
+
+function startHealthCheck() {
+  if (healthCheckInterval) return;
+  // Check every 10 minutes
+  healthCheckInterval = setInterval(verifyWebhookConnectivity, 10 * 60 * 1000);
+  // Initial check after 30s
+  setTimeout(verifyWebhookConnectivity, 30000);
+}
+
+function stopHealthCheck() {
+  if (healthCheckInterval) {
+    clearInterval(healthCheckInterval);
+    healthCheckInterval = null;
   }
 }
 
@@ -342,6 +396,14 @@ app.post('/api/webhook/clickup', async (req, res) => {
 
     console.log(`Webhook Triggered: Task ${taskId} is now QA PARK. Syncing linked tasks...`);
 
+    // Log the event
+    WEBHOOK_LOGS.unshift({
+      timestamp: new Date().toISOString(),
+      event: 'Status Change: QA PARK',
+      task_id: taskId,
+      details: `Task ${taskId} reached QA PARK. Updating linked tasks.`
+    });
+
     // 2. Identify linked tasks (Task Links)
     // ClickUp returns links in task.linked_tasks
     let linkedTasks = (task.linked_tasks || []).map(l => l.link_id === task.id ? l.task_id : l.link_id);
@@ -376,6 +438,49 @@ app.get('/api/webhook/status', (req, res) => {
   res.json(getWebhookStatus());
 });
 
+app.get('/api/webhook/logs', (req, res) => {
+  res.json(WEBHOOK_LOGS.slice(0, 50));
+});
+
+app.delete('/api/clickup/webhook', async (req, res) => {
+  const status = getWebhookStatus();
+  if (!status.active || !status.webhookId) {
+    return res.status(400).json({ error: 'No active webhook to delete' });
+  }
+
+  try {
+    const client = clickupClient(req);
+    await client.delete(`/webhook/${status.webhookId}`);
+    
+    const oldStatus = { ...status };
+    saveWebhookStatus({ active: false });
+    
+    WEBHOOK_LOGS.unshift({
+      timestamp: new Date().toISOString(),
+      event: 'Webhook Disabled',
+      details: `Removed webhook ${oldStatus.webhookId}`
+    });
+
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Webhook Deletion Error:', e.response?.data || e.message);
+    res.status(e.response?.status || 500).json({ error: e.response?.data?.err || e.message });
+  }
+});
+
+app.get('/api/clickup/webhooks', async (req, res) => {
+  const { teamId } = req.query;
+  if (!teamId) return res.status(400).json({ error: 'teamId is required' });
+  
+  try {
+    const client = clickupClient(req);
+    const { data } = await client.get(`/team/${teamId}/webhook`);
+    res.json(data);
+  } catch (e) {
+    res.status(e.response?.status || 500).json({ error: e.response?.data || e.message });
+  }
+});
+
 app.post('/api/clickup/webhook/setup', async (req, res) => {
   const { teamId, endpointBase, token, spaces } = req.body;
 
@@ -401,10 +506,19 @@ app.post('/api/clickup/webhook/setup', async (req, res) => {
       webhookId: data.webhook.id,
       teamId,
       endpoint,
+      endpointBase,
       spaces: spaces || null,
+      token, // Save token for health checks
       createdAt: new Date().toISOString()
     };
     saveWebhookStatus(status);
+    
+    // Log the initiation
+    WEBHOOK_LOGS.unshift({
+      timestamp: new Date().toISOString(),
+      event: 'Webhook Initiated',
+      details: `Registered endpoint ${endpoint}`
+    });
 
     res.json(data.webhook);
   } catch (e) {
@@ -420,4 +534,9 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`✅ Jira → ClickUp Sync server running at http://localhost:${PORT}`);
+  // Start health check on server start if a webhook is already active
+  const status = getWebhookStatus();
+  if (status.active) {
+    startHealthCheck();
+  }
 });
