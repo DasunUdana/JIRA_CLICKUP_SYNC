@@ -2,9 +2,31 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = 3000;
+
+const STATUS_FILE = path.join(__dirname, 'webhook_status.json');
+
+function getWebhookStatus() {
+  try {
+    if (fs.existsSync(STATUS_FILE)) {
+      return JSON.parse(fs.readFileSync(STATUS_FILE, 'utf8'));
+    }
+  } catch (e) {
+    console.error('Error reading status file:', e.message);
+  }
+  return { active: false };
+}
+
+function saveWebhookStatus(status) {
+  try {
+    fs.writeFileSync(STATUS_FILE, JSON.stringify(status, null, 2));
+  } catch (e) {
+    console.error('Error writing status file:', e.message);
+  }
+}
 
 app.use(cors());
 app.use(express.json());
@@ -350,6 +372,10 @@ app.post('/api/webhook/clickup', async (req, res) => {
   }
 });
 
+app.get('/api/webhook/status', (req, res) => {
+  res.json(getWebhookStatus());
+});
+
 app.post('/api/clickup/webhook/setup', async (req, res) => {
   const { teamId, endpointBase, token, spaces } = req.body;
 
@@ -369,6 +395,16 @@ app.post('/api/clickup/webhook/setup', async (req, res) => {
       endpoint,
       events: ['taskStatusUpdated']
     });
+
+    const status = {
+      active: true,
+      webhookId: data.webhook.id,
+      teamId,
+      endpoint,
+      spaces: spaces || null,
+      createdAt: new Date().toISOString()
+    };
+    saveWebhookStatus(status);
 
     res.json(data.webhook);
   } catch (e) {

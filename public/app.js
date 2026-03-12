@@ -583,10 +583,14 @@ async function initiateWebhook() {
         };
 
         const result = await api('POST', '/api/clickup/webhook/setup', payload);
-
+        
+        // Save to state and update UI
+        state.webhook = { active: true, ...result };
+        
         alert(`Successfully created webhook in ClickUp!\nWebhook ID: ${result.id}`);
         btn.innerText = '✓ Webhook Created';
         btn.style.background = 'var(--green)';
+        btn.disabled = true;
     } catch (e) {
         alert(`Failed to create webhook: ${e.message}`);
         btn.innerText = 'Failed';
@@ -597,7 +601,33 @@ async function initiateWebhook() {
             btn.style.background = '';
         }, 3000);
     } finally {
-        btn.disabled = false;
+        // Only re-enable if it failed
+        if (!state.webhook?.active) {
+            btn.disabled = false;
+        }
+    }
+}
+
+async function checkWebhookStatus() {
+    try {
+        const status = await api('GET', '/api/webhook/status');
+        if (status && status.active) {
+            state.webhook = status;
+            const btn = document.getElementById('initWebhookBtn');
+            if (btn) {
+                btn.innerText = '✓ Webhook Active';
+                btn.style.background = 'var(--green)';
+                btn.disabled = true;
+                
+                // Also update the description hint to show it's already setup
+                const hint = btn.nextElementSibling;
+                if (hint) {
+                    hint.innerText = 'Webhook is currently active on the server.';
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Failed to fetch webhook status:', e.message);
     }
 }
 
@@ -640,6 +670,8 @@ function initPersistence() {
         document.getElementById('clickupToken').value = token;
         connectClickUp();
     }
+
+    checkWebhookStatus();
 }
 
 // Listen for list change to update sync summary
