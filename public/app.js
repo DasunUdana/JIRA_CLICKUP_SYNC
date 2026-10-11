@@ -485,10 +485,10 @@ async function startSync() {
   if (!state.selected.length) return alert('No tasks selected to sync.');
 
   const options = {
-    syncPriority: document.getElementById('optPriority')?.checked,
-    syncLabels: document.getElementById('optLabels')?.checked,
-    syncDescription: document.getElementById('optDescription')?.checked,
-    syncDueDate: document.getElementById('optDueDate')?.checked,
+    syncPriority: true,
+    syncLabels: true,
+    syncDescription: true,
+    syncDueDate: true,
   };
 
   const syncBtn = document.getElementById('syncBtn');
@@ -703,10 +703,7 @@ function openScheduleModal() {
     if (el) el.value = val;
   });
 
-  ['schedOptPriority', 'schedOptLabels', 'schedOptDescription', 'schedOptDueDate'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.checked = true;
-  });
+
 
   onSchedSourceTypeChange();
   onSchedIntervalChange();
@@ -842,10 +839,10 @@ async function saveSchedule() {
     interval: document.getElementById('schedInterval')?.value || 'every_hour',
     time: document.getElementById('schedTime')?.value || '09:00',
     options: {
-      syncPriority: document.getElementById('schedOptPriority')?.checked !== false,
-      syncLabels: document.getElementById('schedOptLabels')?.checked !== false,
-      syncDescription: document.getElementById('schedOptDescription')?.checked !== false,
-      syncDueDate: document.getElementById('schedOptDueDate')?.checked !== false,
+      syncPriority: true,
+      syncLabels: true,
+      syncDescription: true,
+      syncDueDate: true,
     },
   };
 

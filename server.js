@@ -225,19 +225,20 @@ async function performSync(jiraCreds, clickupToken, jql, listId, options = {}) {
   for (const issue of allIssues) {
     try {
       const description = issue.fields.description ? jiraDescToMarkdown(issue.fields.description) : '';
-
       const projectKey = issue.key.split('-')[0];
-      let taskTags = options.syncLabels !== false && issue.fields.labels?.length ? [...issue.fields.labels] : [];
-      if (projectKey && !taskTags.includes(projectKey)) {
+      
+      // Only use the project key as the tag (ignore other Jira labels)
+      let taskTags = [];
+      if (projectKey) {
         taskTags.push(projectKey);
       }
 
       const payload = {
         name: `[${issue.key}] ${issue.fields.summary}`,
-        description: options.syncDescription !== false ? (description || undefined) : undefined,
-        priority: options.syncPriority !== false ? mapPriority(issue.fields.priority?.name) : undefined,
-        tags: taskTags.length > 0 ? taskTags : undefined,
-        due_date: options.syncDueDate !== false && issue.fields.duedate ? new Date(issue.fields.duedate).getTime() : undefined,
+        description: description || undefined,
+        priority: mapPriority(issue.fields.priority?.name),
+        tags: taskTags,
+        due_date: issue.fields.duedate ? new Date(issue.fields.duedate).getTime() : undefined,
       };
 
       if (jiraCustomFieldId) {
